@@ -12,7 +12,6 @@ class _DataBatch<T> {
 
   final LinkedHashSet<String> _ids = LinkedHashSet<String>();
   final Map<String, T> _itemsById = {};
-  final List<T> _items = [];
 
   final _completer = Completer<void>();
 
@@ -28,6 +27,10 @@ class _DataBatch<T> {
   /// Adds an ID to the batch, ignoring duplicates.
   void add(String id) {
     _ids.add(id);
+  }
+
+  List<T> get _items {
+    return _ids.map((id) => _itemsById[id]!).toList();
   }
 
   /// Executes the batch by calling the provided [execute] function to fetch the data for the added batch IDs.
@@ -48,15 +51,10 @@ class _DataBatch<T> {
       _itemsById[id] = items[i];
     }
 
-    for (final id in _ids) {
-      final item = _itemsById[id];
-
-      if (item == null) {
-        throw 'Batch error: Missing ID $id not extracted from idExtractor.';
-      }
-
-      _items.add(item);
-    }
+    assert(
+      _itemsById.length == _ids.length,
+      'Batch error: Expected ${_ids.length} unique IDs extracted by idExtractor but it extracted ${_itemsById.length}.',
+    );
 
     _completer.complete();
   }
