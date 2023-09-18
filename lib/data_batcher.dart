@@ -36,27 +36,31 @@ class _DataBatch<T> {
   /// Executes the batch by calling the provided [execute] function to fetch the data for the added batch IDs.
   /// The batch is completed with a map of IDs->items when the batcher function completes.
   Future<void> _execute() async {
-    final items = await execute(_ids.toList());
+    try {
+      final items = await execute(_ids.toList());
 
-    assert(
-      items.length == _ids.length,
-      'Batch error: Items returned length ${items.length} which is not equal to IDs length ${_ids.length}.',
-    );
+      assert(
+        items.length == _ids.length,
+        'Batch error: Items returned length ${items.length} which is not equal to IDs length ${_ids.length}.',
+      );
 
-    for (int i = 0; i < items.length; i++) {
-      // By default it is assumed that the items are returned in the same order as the list of input IDs provided
-      // to the [execute] function and the IDs of the items are extracted using that ordering. If the ordering is not stable,
-      // then an [idExtractor] can be used.
-      final id = idExtractor?.call(items[i]) ?? _ids.elementAt(i);
-      _itemsById[id] = items[i];
+      for (int i = 0; i < items.length; i++) {
+        // By default it is assumed that the items are returned in the same order as the list of input IDs provided
+        // to the [execute] function and the IDs of the items are extracted using that ordering. If the ordering is not stable,
+        // then an [idExtractor] can be used.
+        final id = idExtractor?.call(items[i]) ?? _ids.elementAt(i);
+        _itemsById[id] = items[i];
+      }
+
+      assert(
+        _itemsById.length == _ids.length,
+        'Batch error: Expected ${_ids.length} unique IDs extracted by idExtractor but it extracted ${_itemsById.length}.',
+      );
+
+      _completer.complete();
+    } catch (e) {
+      _completer.completeError(e);
     }
-
-    assert(
-      _itemsById.length == _ids.length,
-      'Batch error: Expected ${_ids.length} unique IDs extracted by idExtractor but it extracted ${_itemsById.length}.',
-    );
-
-    _completer.complete();
   }
 }
 
@@ -66,7 +70,7 @@ class DataBatcher<T> {
 
   /// IDs are batched together in the current tick of the event loop. If an ID is attempted
   /// to be batched again on a subsequent tick of the event loop while still in-flight from a previous
-  /// batch, then by default it is not batched again the value returned for that ID is the value returned
+  /// batch, then by default it is not batched again and the value returned for that ID is the value returned
   /// by the already in-flight batch.
   final bool dedupeInFlight;
 
@@ -75,8 +79,6 @@ class DataBatcher<T> {
   final Map<String, _DataBatch<T>> _inFlightBatchMap = {};
 
   _DataBatch<T>? _eventBatch;
-
-  static final Map<String, DataBatcher> _globalBatchers = {};
 
   DataBatcher({
     required this.execute,
@@ -105,12 +107,18 @@ class DataBatcher<T> {
         _eventBatch = null;
 
         batch!._execute();
-        await batch.completed;
 
-        // After the batch is completed, if IDs are being de-duped, clear them from the in flight batch map.
-        if (dedupeInFlight) {
-          for (id in batch._ids) {
-            _inFlightBatchMap.remove(id);
+        try {
+          await batch.completed;
+        } catch (e) {
+          // Swallow micro-task exception. Exception is instead handled by the caller.
+        } finally {
+          // After the batch is resolves either successfully or in error, if ID de-duping in flight is enabled,
+          // clear the batch's IDs from the in flight batch map.
+          if (dedupeInFlight) {
+            for (id in batch._ids) {
+              _inFlightBatchMap.remove(id);
+            }
           }
         }
       });
@@ -151,22 +159,7 @@ class DataBatcher<T> {
     batch.add(id);
 
     await batch.completed;
-    return batch._itemsById[id]!;
-  }
-
-  /// Creates and executes a global batcher
-  static Future<T> run<T>(String id, Future<T> Function() executeFn) {
-    final globalBatcher = (
-      _globalBatchers[id] ??
-          DataBatcher<T>(
-            execute: (_) async {
-              final result = await executeFn();
-              return [result];
-            },
-          ),
-    ) as DataBatcher<T>;
-
-    return globalBatcher.add(id);
+    return batch._itemsById[id] as T;
   }
 
   Future<List<T>> complete() async {

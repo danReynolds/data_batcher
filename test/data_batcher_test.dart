@@ -224,4 +224,14 @@ void main() {
     expect(result2[1].id, '2');
     expect(result2[2].id, '1');
   });
+
+  test('Throws error if a batch request fails', () async {
+    final batcher = DataBatcher<TestModel>(
+      execute: (inputs) async {
+        throw Exception();
+      },
+    );
+
+    expectLater(batcher.add('1'), throwsException);
+  });
 }
