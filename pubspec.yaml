@@ -1,7 +1,7 @@
 name: data_batcher
-description: A new Flutter package project.
+description: Data batcher batches and de-dupes data fetched in the same tick of the event loop.
 version: 0.0.1
-homepage:
+homepage: https://github.com/danReynolds/data_batcher
 
 environment:
   sdk: '>=3.1.1 <4.0.0'
