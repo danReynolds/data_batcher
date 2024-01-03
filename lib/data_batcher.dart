@@ -172,4 +172,8 @@ class DataBatcher<T> {
     await batch.completed;
     return batch._items;
   }
+
+  bool isFetching(String id) {
+    return _inFlightBatchMap.containsKey(id);
+  }
 }

@@ -1,6 +1,6 @@
 name: data_batcher
 description: Data batcher batches and de-dupes data fetched in the same tick of the event loop.
-version: 0.0.1
+version: 0.0.2
 homepage: https://github.com/danReynolds/data_batcher
 
 environment:
