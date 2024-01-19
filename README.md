@@ -1,6 +1,6 @@
 # Data Batcher
 
-Data batcher batches and de-dupes data fetched in the same cycle of the event loop.
+Data batcher batches and de-dupes data fetched in the same task of the event loop.
 
 ```dart
 final batcher = DataBatcher<String>(
